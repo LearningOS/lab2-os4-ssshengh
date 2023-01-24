@@ -60,6 +60,41 @@ impl MemorySet {
             None,
         );
     }
+    pub fn insert_framed_area_check(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) -> Option<()>{
+        let can_map = self.areas.iter().find(|area| {
+            let start: VirtAddr = area.vpn_range.get_start().into();
+            let end: VirtAddr = area.vpn_range.get_end().into();
+            (start_va < start && end_va > start) || (start_va < end && end_va > end)
+        });
+        if can_map.is_some() {
+            return None;
+        }
+
+        self.insert_framed_area(start_va, end_va, permission);
+        Some(())
+    }
+    pub fn move_frame_area_check(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+    ) -> Option<()>{
+        let info = self.areas.iter_mut().enumerate().find(|(id, area)| {
+            let start: VirtAddr = area.vpn_range.get_start().into();
+            let end: VirtAddr = area.vpn_range.get_end().into();
+            start == start_va && end == end_va
+        });
+        if let Some((id,area)) = info {
+            area.unmap(&mut self.page_table);
+            self.areas.remove(id);
+            return Some(())
+        }
+        None
+    }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
